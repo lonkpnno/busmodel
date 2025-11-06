@@ -3,6 +3,7 @@ package com.lonk.busmodel.config.impl;
 import com.lonk.busmodel.config.IUserIdConfigSupplier;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
+import org.aspectj.lang.ProceedingJoinPoint;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -16,10 +17,13 @@ import java.util.Optional;
  * @author lonk
  */
 public class DefaultUserIdConfigSupplier implements IUserIdConfigSupplier {
+    /**
+     * 用户id请求头名
+     */
     private final static String USER_ID_HEADER = "userId";
 
     @Override
-    public String getUserId() {
+    public String getUserId(ProceedingJoinPoint pjp) {
         return Optional.ofNullable(getRequest())
                 .map(req -> req.getHeader(USER_ID_HEADER))
                 .orElse(StringUtils.EMPTY);

@@ -8,7 +8,6 @@ gen/
 
 # Build files
 target/
-**/node_modules/
 *.class
 *.jar
 *.war
@@ -18,3 +17,4 @@ target/
 *.tmp
 *.bak
 *.swp
+*.DS_Store

@@ -4,7 +4,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.lonk.busmodel.bo.RuleBO;
 import com.lonk.busmodel.config.IRuleConfigSupplier;
-import com.lonk.busmodel.config.IUserIdConfigSupplier;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -31,9 +30,6 @@ public class Executors {
     private final AntPathMatcher antPathMatcher = new AntPathMatcher();
 
     @Resource
-    private IUserIdConfigSupplier userIdConfigSupplier;
-
-    @Resource
     private IRuleConfigSupplier ruleConfigSupplier;
 
     /**
@@ -42,7 +38,7 @@ public class Executors {
      * @param requestApiUrl 请求qpi路径
      * @return 执行器
      */
-    public Executor getExecutor(String requestApiUrl) {
+    public Executor getExecutor(String requestApiUrl, String userId) {
         // 先匹配全局的，全局没有则再匹配用户维度的
         Executor executor = doGetExecutor(requestApiUrl
                 , GLOBAL_API_JOIN + requestApiUrl
@@ -51,12 +47,11 @@ public class Executors {
             return executor;
         }
 
-        String userId = userIdConfigSupplier.getUserId();
         List<RuleBO> userRuleList = Optional.ofNullable(ruleConfigSupplier.getUserRuleList()).orElse(Lists.newArrayList());
         // 用户维度下，不提供用户标识不拦截
         if (StringUtils.isEmpty(userId)) {
             if (userRuleList.stream().anyMatch(it -> antPathMatcher.match(it.getApiUrl(), requestApiUrl))) {
-                log.trace("用户维度拦截，但用户信息为空，requestApiUrl={}", requestApiUrl);
+                log.info("用户维度拦截，但用户信息为空，requestApiUrl={}", requestApiUrl);
             }
             return null;
         }

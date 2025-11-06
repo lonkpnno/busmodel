@@ -1,5 +1,6 @@
 package com.lonk.busmodel.aspect;
 
+import com.lonk.busmodel.config.IUserIdConfigSupplier;
 import com.lonk.busmodel.executors.Executor;
 import com.lonk.busmodel.executors.Executors;
 import jakarta.annotation.Resource;
@@ -22,6 +23,9 @@ public class BusAspect {
     @Resource
     private Executors executors;
 
+    @Resource
+    private IUserIdConfigSupplier userIdConfigSupplier;
+
     /**
      * 切点
      */
@@ -40,12 +44,14 @@ public class BusAspect {
             return pjp.proceed();
         }
 
-        Executor executor = executors.getExecutor(attrs.getRequest().getRequestURI());
+        String requestApiUrl = attrs.getRequest().getRequestURI();
+        String userId = userIdConfigSupplier.getUserId(pjp);
+        Executor executor = executors.getExecutor(requestApiUrl, userId);
         // 无对应控制器
         if (Objects.isNull(executor)) {
             return pjp.proceed();
         }
-        return executor.handle(pjp);
+        return executor.handle(pjp, requestApiUrl, userId);
     }
 
 }

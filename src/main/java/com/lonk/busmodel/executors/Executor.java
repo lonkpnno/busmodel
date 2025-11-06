@@ -35,19 +35,21 @@ public class Executor {
     /**
      * 在并发度控制下执行目标函数
      *
-     * @param pjp 切点
+     * @param pjp           切点
+     * @param requestApiUrl 请求api路径
+     * @param userId        用户标识
      * @return 目标函数执行结果
      * @throws Throwable 目标函数所抛异常
      */
-    public Object handle(ProceedingJoinPoint pjp) throws Throwable {
+    public Object handle(ProceedingJoinPoint pjp, String requestApiUrl, String userId) throws Throwable {
         try {
             // 超时
             if (!semaphore.tryAcquire(ruleBO.getTimeout(), TimeUnit.MILLISECONDS)) {
-                log.warn("请求拦截，pjp={}", pjp);
+                log.warn("请求拦截，userId={}, requestApiUrl={}", userId, requestApiUrl);
                 return "系统繁忙";
             }
         } catch (InterruptedException interruptedException) {
-            log.warn("请求中断，pjp={}", pjp);
+            log.warn("请求中断，userId={}, requestApiUrl={}", userId, requestApiUrl);
             return "请求中断";
         }
 
