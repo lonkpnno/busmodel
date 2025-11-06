@@ -1,5 +1,6 @@
 package com.lonk.busmodel.aspect;
 
+import com.lonk.busmodel.bo.RuleKeyBO;
 import com.lonk.busmodel.config.IUserIdConfigSupplier;
 import com.lonk.busmodel.executors.Executor;
 import com.lonk.busmodel.executors.Executors;
@@ -46,12 +47,14 @@ public class BusAspect {
 
         String requestApiUrl = attrs.getRequest().getRequestURI();
         String userId = userIdConfigSupplier.getUserId(pjp);
-        Executor executor = executors.getExecutor(requestApiUrl, userId);
+
+        RuleKeyBO ruleKeyBO = executors.matchRuleKeyBO(requestApiUrl, userId);
+        Executor executor = executors.getExecutor(ruleKeyBO);
         // 无对应控制器
         if (Objects.isNull(executor)) {
             return pjp.proceed();
         }
-        return executor.handle(pjp, requestApiUrl, userId);
+        return executor.handle(pjp, userId, ruleKeyBO.getRuleBO());
     }
 
 }

@@ -26,4 +26,9 @@ public class RuleBO {
      */
     private int timeout;
 
+    /**
+     * 失败提示信息
+     */
+    private String failMsg;
+
 }

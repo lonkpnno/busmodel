@@ -3,6 +3,7 @@ package com.lonk.busmodel.executors;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.lonk.busmodel.bo.RuleBO;
+import com.lonk.busmodel.bo.RuleKeyBO;
 import com.lonk.busmodel.config.IRuleConfigSupplier;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -21,9 +22,10 @@ import java.util.Optional;
  */
 @Slf4j
 public class Executors {
-    private final static String USERID_API_JOIN = ";";
-
-    private final static String GLOBAL_API_JOIN = ",";
+    /**
+     * 维度+apiUrl拼接符
+     */
+    private final static String API_KEY_JOIN = ",";
 
     private final Map<String, Executor> EXECUTOR_MAP = Maps.newConcurrentMap();
 
@@ -35,52 +37,72 @@ public class Executors {
     /**
      * 根据请求api路径获取一个执行器
      *
-     * @param requestApiUrl 请求qpi路径
+     * @param ruleKeyBO 控制规则
      * @return 执行器
      */
-    public Executor getExecutor(String requestApiUrl, String userId) {
-        // 先匹配全局的，全局没有则再匹配用户维度的
-        Executor executor = doGetExecutor(requestApiUrl
-                , GLOBAL_API_JOIN + requestApiUrl
-                , Optional.ofNullable(ruleConfigSupplier.getGlobalRuleList()).orElse(Lists.newArrayList()));
-        if (Objects.nonNull(executor)) {
-            return executor;
+    public Executor getExecutor(RuleKeyBO ruleKeyBO) {
+        if (Objects.isNull(ruleKeyBO)) {
+            return null;
         }
-
-        List<RuleBO> userRuleList = Optional.ofNullable(ruleConfigSupplier.getUserRuleList()).orElse(Lists.newArrayList());
-        // 用户维度下，不提供用户标识不拦截
-        if (StringUtils.isEmpty(userId)) {
-            if (userRuleList.stream().anyMatch(it -> antPathMatcher.match(it.getApiUrl(), requestApiUrl))) {
-                log.info("用户维度拦截，但用户信息为空，requestApiUrl={}", requestApiUrl);
-            }
+        String controlApiUrlKey = ruleKeyBO.getControlApiUrlKey();
+        RuleBO ruleBO = ruleKeyBO.getRuleBO();
+        if (StringUtils.isEmpty(controlApiUrlKey)
+                || Objects.isNull(ruleBO)
+                || StringUtils.isEmpty(ruleBO.getApiUrl())) {
             return null;
         }
 
-        return doGetExecutor(requestApiUrl, userId + USERID_API_JOIN + requestApiUrl, userRuleList);
-    }
-
-    private Executor doGetExecutor(String requestApiUrl, String apiUrlKey, List<RuleBO> configRuleList) {
-        Executor executor = EXECUTOR_MAP.get(apiUrlKey);
+        Executor executor = EXECUTOR_MAP.get(controlApiUrlKey);
         if (Objects.nonNull(executor)) {
             return executor;
         }
 
-        for (RuleBO ruleBO : configRuleList) {
-            if (Objects.isNull(ruleBO)
-                    || !antPathMatcher.match(ruleBO.getApiUrl(), requestApiUrl)) {
-                continue;
-            }
-            // 匹配到控制路径
-            synchronized (EXECUTOR_MAP) {
-                executor = EXECUTOR_MAP.get(apiUrlKey);
-                if (Objects.nonNull(executor)) {
-                    return executor;
-                }
-                executor = new Executor(ruleBO);
-                EXECUTOR_MAP.put(apiUrlKey, executor);
+        synchronized (EXECUTOR_MAP) {
+            executor = EXECUTOR_MAP.get(controlApiUrlKey);
+            if (Objects.nonNull(executor)) {
                 return executor;
             }
+            executor = new Executor(ruleBO.getConcurrency());
+            EXECUTOR_MAP.put(controlApiUrlKey, executor);
+            return executor;
         }
+    }
+
+    /**
+     * 获取控制规则
+     *
+     * @param requestApiUrl 请求的api路径
+     * @param userId        用户id
+     * @return 控制规则
+     */
+    public RuleKeyBO matchRuleKeyBO(String requestApiUrl, String userId) {
+        RuleBO ruleBO;
+        if (StringUtils.isNotEmpty(userId)
+                && Objects.nonNull(ruleBO = getRuleBO(requestApiUrl
+                , Optional.ofNullable(ruleConfigSupplier.getUserRuleList()).orElse(Lists.newArrayList())))) {
+            return RuleKeyBO.builder()
+                    .controlApiUrlKey(userId + API_KEY_JOIN + requestApiUrl)
+                    .ruleBO(ruleBO)
+                    .build();
+        }
+
+        ruleBO = getRuleBO(requestApiUrl, Optional.ofNullable(ruleConfigSupplier.getGlobalRuleList()).orElse(Lists.newArrayList()));
+        if (Objects.isNull(ruleBO)) {
+            return null;
+        }
+        return RuleKeyBO.builder()
+                .controlApiUrlKey(API_KEY_JOIN + requestApiUrl)
+                .ruleBO(ruleBO)
+                .build();
+    }
+
+    private RuleBO getRuleBO(String requestApiUrl, List<RuleBO> configRuleList) {
+        for (RuleBO ruleBO : Optional.ofNullable(configRuleList).orElse(Lists.newArrayList())) {
+            if (antPathMatcher.match(ruleBO.getApiUrl(), requestApiUrl)) {
+                return ruleBO;
+            }
+        }
+
         return null;
     }
 
